@@ -160,6 +160,13 @@ document.querySelectorAll('.theme-toggle, .mobile-theme-toggle').forEach(functio
     });
   });
 })();
+// Force external links to open in new tab on mobile
+document.querySelectorAll('a[target="_blank"]').forEach(function(a) {
+  a.addEventListener('click', function(e) {
+    e.preventDefault();
+    window.open(this.href, '_blank', 'noopener,noreferrer');
+  });
+});
 </script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})"></script>

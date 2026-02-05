@@ -75,6 +75,13 @@ document.querySelectorAll('.theme-toggle, .mobile-theme-toggle').forEach(functio
     });
   });
 })();
+// Force external links to open in new tab on mobile
+document.querySelectorAll('a[target="_blank"]').forEach(function(a) {
+  a.addEventListener('click', function(e) {
+    e.preventDefault();
+    window.open(this.href, '_blank', 'noopener,noreferrer');
+  });
+});
 </script>`;
 
 const EASTER_EGG_SCRIPT = `<script>
