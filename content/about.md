@@ -1,0 +1,3 @@
+The past 5 years of my professional career have been with Amazon. I first joined Amazon Web Services (AWS) to build a secure, cross-domain network protocol and fully designed and launched an AWS service console. After two years I joined AWS CloudTrail, and globally launched critical dataplane systems to support traffic in excess of 300k network requests/second (in a single region!)
+
+I also contributed to internal adoption of Rust and built core libraries required for all AWS services. I recently joined Amazon Ads in NYC to focus on building products closer to consumers.

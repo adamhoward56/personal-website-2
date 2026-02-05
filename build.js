@@ -1,0 +1,429 @@
+const fs = require('fs');
+const path = require('path');
+const matter = require('gray-matter');
+const { marked } = require('marked');
+
+const CONTENT_DIR = path.join(__dirname, 'content');
+const POSTS_DIR = path.join(CONTENT_DIR, 'blog');
+const DOCS_DIR = path.join(__dirname, 'docs');
+const ABOUT_FILE = path.join(CONTENT_DIR, 'about.md');
+const PROJECTS_FILE = path.join(CONTENT_DIR, 'projects.md');
+const SUBTITLE_FILE = path.join(CONTENT_DIR, 'subtitle.md');
+const BLOG_SETTINGS_FILE = path.join(POSTS_DIR, 'settings.json');
+
+// --- Helpers ---
+
+function readPosts() {
+  if (!fs.existsSync(POSTS_DIR)) return [];
+  return fs.readdirSync(POSTS_DIR)
+    .filter(f => f.endsWith('.md'))
+    .map(file => {
+      const raw = fs.readFileSync(path.join(POSTS_DIR, file), 'utf-8');
+      const { data, content } = matter(raw);
+      return {
+        slug: file.replace(/\.md$/, ''),
+        title: data.title || file,
+        date: data.date || '',
+        description: data.description || '',
+        html: marked(content),
+      };
+    })
+    .sort((a, b) => (b.date > a.date ? 1 : -1));
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+// --- Templates ---
+
+const THEME_SCRIPT = `<script>
+(function() {
+  var saved = localStorage.getItem('theme');
+  if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+  }
+})();
+</script>`;
+
+const TOGGLE_SCRIPT = `<script>
+document.querySelectorAll('.theme-toggle, .mobile-theme-toggle').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  });
+});
+(function() {
+  var btn = document.querySelector('.menu-toggle');
+  var nav = document.querySelector('.mobile-nav');
+  if (!btn || !nav) return;
+  btn.addEventListener('click', function() {
+    var open = btn.classList.toggle('open');
+    nav.classList.toggle('open');
+    btn.setAttribute('aria-expanded', open);
+    nav.setAttribute('aria-hidden', !open);
+    document.body.style.overflow = open ? 'hidden' : '';
+  });
+  nav.querySelectorAll('a').forEach(function(a) {
+    a.addEventListener('click', function() {
+      btn.classList.remove('open');
+      nav.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+      nav.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    });
+  });
+})();
+</script>`;
+
+const EASTER_EGG_SCRIPT = `<script>
+(function() {
+  console.log('\\n' +
+    '               __\\n' +
+    '              / _)\\n' +
+    '     _.----._/ /\\n' +
+    '    /         /\\n' +
+    ' __/ (  | (  |\\n' +
+    '/__.-\\x27|_|--|_|\\n');
+
+  // konami
+  var seq = [38,38,40,40,37,39,37,39,66,65], pos = 0;
+  document.addEventListener('keydown', function(e) {
+    pos = e.keyCode === seq[pos] ? pos + 1 : 0;
+    if (pos === seq.length) {
+      pos = 0;
+      document.documentElement.classList.add('party');
+      setTimeout(function() {
+        document.documentElement.classList.add('party-out');
+        document.documentElement.classList.remove('party');
+        setTimeout(function() { document.documentElement.classList.remove('party-out'); }, 800);
+      }, 3000);
+    }
+  });
+
+  // fireworks
+  var colors = ['#ff2055','#ff6b2b','#ffe13a','#2bf5ff','#a855f7','#34d399','#ff47ab','#3b82f6'];
+
+  function makeEl(css) {
+    var el = document.createElement('div');
+    el.style.cssText = 'position:fixed;border-radius:50%;pointer-events:none;z-index:9999;' + css;
+    document.body.appendChild(el);
+    return el;
+  }
+
+  function sparkle(sx, sy) {
+    for (var j = 0; j < 3; j++) {
+      var sz = 2 + Math.random() * 4;
+      var c = colors[Math.floor(Math.random() * colors.length)];
+      var ox = (Math.random() - 0.5) * 14, oy = (Math.random() - 0.5) * 14;
+      var s = makeEl('width:' + sz + 'px;height:' + sz + 'px;left:' + (sx + ox) + 'px;top:' + (sy + oy) + 'px;background:#fff;box-shadow:0 0 6px ' + c + ',0 0 12px ' + c);
+      s.animate([
+        { transform: 'scale(1.5)', opacity: 1 },
+        { transform: 'scale(0)', opacity: 0 }
+      ], { duration: 300 + Math.random() * 400, easing: 'ease-out' }).onfinish = function() { this.effect.target.remove(); };
+    }
+  }
+
+  function launchParticle(x, y, angle, vel, c, dur) {
+    var size = 3 + Math.random() * 5;
+    var dot = makeEl('width:' + size + 'px;height:' + size + 'px;left:' + x + 'px;top:' + y + 'px;background:' + c + ';box-shadow:0 0 6px ' + c + ',0 0 14px ' + c);
+    var dx = Math.cos(angle) * vel, dy = Math.sin(angle) * vel;
+
+    // trail
+    [0.12, 0.28, 0.44].forEach(function(frac) {
+      var tx = dx * frac, ty = (dy + 80) * frac;
+      setTimeout(function() {
+        var tr = makeEl('width:2px;height:2px;left:' + x + 'px;top:' + y + 'px;background:' + c + ';opacity:0.5');
+        tr.animate([
+          { transform: 'translate(' + tx + 'px,' + ty + 'px) scale(1)', opacity: 0.5 },
+          { transform: 'translate(' + tx + 'px,' + (ty + 12) + 'px) scale(0)', opacity: 0 }
+        ], { duration: 400, easing: 'ease-out' }).onfinish = function() { this.effect.target.remove(); };
+      }, dur * frac);
+    });
+
+    // main particle
+    dot.animate([
+      { transform: 'translate(0,0) scale(1.3)', opacity: 1 },
+      { transform: 'translate(' + dx + 'px,' + (dy + 80) + 'px) scale(0.3)', opacity: 0.8, offset: 0.7 },
+      { transform: 'translate(' + dx + 'px,' + (dy + 95) + 'px) scale(0)', opacity: 0 }
+    ], { duration: dur, easing: 'cubic-bezier(.15,.8,.3,1)' }).onfinish = function() {
+      sparkle(x + dx, y + dy + 90);
+      dot.remove();
+    };
+  }
+
+  function firework(x, y) {
+    for (var i = 0; i < 50; i++) {
+      var angle = (Math.PI * 2 / 50) * i + (Math.random() - 0.5) * 0.3;
+      var vel = 130 + Math.random() * 220;
+      var dur = 900 + Math.random() * 500;
+      launchParticle(x, y, angle, vel, colors[i % colors.length], dur);
+    }
+  }
+
+  function burst(el) {
+    var z = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+    var r = el.getBoundingClientRect();
+    var cx = (r.left + r.width / 2) / z, cy = (r.top + r.height / 2) / z;
+    firework(cx, cy);
+    setTimeout(function() { firework(cx - 100, cy - 40); }, 150);
+    setTimeout(function() { firework(cx + 110, cy - 30); }, 300);
+  }
+
+  // name tap
+  var name = document.querySelector('h1.name');
+  if (name) {
+    var clicks = 0, timer;
+    name.style.cursor = 'default';
+    name.addEventListener('click', function() {
+      clicks++;
+      clearTimeout(timer);
+      timer = setTimeout(function() { clicks = 0; }, 800);
+      if (clicks >= 7) {
+        clicks = 0;
+        name.classList.remove('wiggle');
+        void name.offsetWidth;
+        name.classList.add('wiggle');
+        name.addEventListener('animationend', function() { name.classList.remove('wiggle'); }, { once: true });
+        burst(name);
+      }
+    });
+  }
+
+})();
+</script>`;
+
+function headerHtml() {
+  return `<a href="#main-content" class="skip-link">Skip to main content</a>
+  <header role="banner">
+    <div class="container">
+      <a href="/" class="site-name">Adam Howard</a>
+      <nav aria-label="Main navigation">
+        <a href="/#about">About</a>
+        <a href="/#projects">Projects</a>
+        <a href="/#writing">Writing</a>
+        <button class="theme-toggle" aria-label="Toggle theme">
+          <svg class="icon-sun" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"/></svg>
+          <svg class="icon-moon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
+        </button>
+      </nav>
+      <button class="menu-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobile-nav">
+        <span></span><span></span>
+      </button>
+    </div>
+  </header>
+  <div class="mobile-nav" id="mobile-nav" aria-hidden="true">
+    <nav aria-label="Mobile navigation">
+      <a href="/#about">About</a>
+      <a href="/#projects">Projects</a>
+      <a href="/#writing">Writing</a>
+      <button class="mobile-theme-toggle" aria-label="Toggle theme">
+        <svg class="icon-sun" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"/></svg>
+        <svg class="icon-moon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
+      </button>
+    </nav>
+  </div>`;
+}
+
+function page(title, body, seo) {
+  seo = seo || {};
+  const desc = seo.description || 'Adam Howard — Software Engineer at Amazon Ads in New York City. Building scalable systems, shipping products, and writing about technology.';
+  const url = seo.url || 'https://adamhoward56.github.io';
+  const type = seo.type || 'website';
+  const jsonLd = seo.jsonLd ? `\n  <script type="application/ld+json">${JSON.stringify(seo.jsonLd)}</script>` : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <meta name="description" content="${desc}">
+  <meta name="author" content="Adam Howard">
+  <link rel="canonical" href="${url}">
+
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${desc}">
+  <meta property="og:url" content="${url}">
+  <meta property="og:type" content="${type}">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:site_name" content="Adam Howard">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:description" content="${desc}">${jsonLd}
+
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  ${THEME_SCRIPT}
+</head>
+<body>
+  ${headerHtml()}
+  <main id="main-content" class="container">
+    ${body}
+  </main>
+  <footer role="contentinfo">
+    <div class="container">
+      <p>&copy; ${new Date().getFullYear()} Adam Howard</p>
+    </div>
+  </footer>
+  ${TOGGLE_SCRIPT}
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})"></script>
+  ${EASTER_EGG_SCRIPT}
+</body>
+</html>`;
+}
+
+// --- Build pages ---
+
+function buildHome(posts) {
+  const subtitleRaw = fs.existsSync(SUBTITLE_FILE) ? fs.readFileSync(SUBTITLE_FILE, 'utf-8').trim() : '';
+  const subtitleHtml = subtitleRaw.split('\n').join('<br>');
+
+  const aboutRaw = fs.existsSync(ABOUT_FILE) ? fs.readFileSync(ABOUT_FILE, 'utf-8') : '';
+  const aboutHtml = marked(aboutRaw);
+
+  const projectsRaw = fs.existsSync(PROJECTS_FILE) ? fs.readFileSync(PROJECTS_FILE, 'utf-8') : '';
+  const { data: projectsData } = matter(projectsRaw);
+  const projects = projectsData.projects || [];
+
+  const projectsHtml = projects.length === 0
+    ? ''
+    : `<div class="project-grid">
+        ${projects.map(p => {
+          const tags = (p.tags || []).map(t => `<span class="project-tag">${t}</span>`).join('');
+          return `<a href="${p.url}" class="project-card" target="_blank" rel="noopener noreferrer">
+          <span class="project-icon" aria-hidden="true">${p.title.charAt(0)}</span>
+          <h3>${p.title}</h3>
+          <p>${p.description}</p>
+          ${tags ? `<div class="project-tags">${tags}</div>` : ''}
+        </a>`;
+        }).join('\n        ')}
+      </div>`;
+
+  const blogSettings = fs.existsSync(BLOG_SETTINGS_FILE)
+    ? JSON.parse(fs.readFileSync(BLOG_SETTINGS_FILE, 'utf-8'))
+    : { visible: true };
+
+  const comingSoonText = blogSettings.comingSoonText || 'Coming soon';
+  const comingSoonHtml = `<div class="coming-soon">
+    <div class="construction-tape"></div>
+    <p>${comingSoonText}</p>
+    <div class="construction-tape"></div>
+  </div>`;
+
+  const postListHtml = !blogSettings.visible
+    ? comingSoonHtml
+    : posts.length === 0
+      ? comingSoonHtml
+      : `<div class="post-list">
+          ${posts.map(p => `<a href="/blog/${p.slug}.html" class="post-item">
+            <time>${formatDate(p.date)}</time>
+            <h3>${p.title}</h3>
+            <p>${p.description}</p>
+          </a>`).join('\n          ')}
+        </div>`;
+
+  const body = `
+    <section class="hero">
+      <h1 class="name">Adam Howard</h1>
+      <p class="subtitle">${subtitleHtml}</p>
+      <div class="social-links">
+        <a href="https://github.com/adamhoward56" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg> GitHub</a>
+        <a href="https://linkedin.com/in/adamhoward56" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg> LinkedIn</a>
+        <a href="mailto:adamhoward56@gmail.com"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> Email</a>
+        <a href="https://youtube.com/@adamhoward56" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg> YouTube</a>
+      </div>
+      <span class="location"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg> New York City</span>
+    </section>
+
+    <section id="about" class="about">
+      <h2>About</h2>
+      ${aboutHtml}
+    </section>
+
+    <section id="projects">
+      <h2>Projects</h2>
+      ${projectsData.subtitle ? `<p class="section-desc">${projectsData.subtitle}</p>` : ''}
+      ${projectsHtml}
+    </section>
+
+    <section id="writing">
+      <h2>Writing</h2>
+      ${blogSettings.subtitle ? `<p class="section-desc">${blogSettings.subtitle}</p>` : ''}
+      ${postListHtml}
+    </section>`;
+
+  return page('Adam Howard – Software Engineer, NYC', body, {
+    description: 'Adam Howard is an L5 Software Development Engineer (SDE) at Amazon Ads in New York City. Previously at AWS, building scalable distributed systems, service consoles, and core Rust libraries. Creator of TinySketch (2M+ installs).',
+    url: 'https://adamhoward56.github.io',
+    type: 'website',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'Person',
+      name: 'Adam Howard',
+      jobTitle: 'L5 Software Development Engineer (SDE)',
+      worksFor: { '@type': 'Organization', name: 'Amazon Ads' },
+      url: 'https://adamhoward56.github.io',
+      address: { '@type': 'PostalAddress', addressLocality: 'New York City', addressRegion: 'NY', addressCountry: 'US' },
+      sameAs: [
+        'https://github.com/adamhoward56',
+        'https://linkedin.com/in/adamhoward56',
+        'https://youtube.com/@adamhoward56'
+      ],
+      knowsAbout: ['Software Engineering', 'Distributed Systems', 'Rust', 'AWS', 'Full-Stack Development', 'Game Development']
+    }
+  });
+}
+
+
+function buildPost(post) {
+  const body = `
+    <section class="hero">
+      <a href="/" class="back-link">&larr; Back</a>
+      <div class="post-header">
+        <time>${formatDate(post.date)}</time>
+        <h1>${post.title}</h1>
+        ${post.description ? `<p class="subtitle">${post.description}</p>` : ''}
+      </div>
+    </section>
+
+    <section style="padding-top:0">
+      <div class="prose">
+        ${post.html}
+      </div>
+    </section>`;
+
+  return page(post.title + ' – Adam Howard', body, {
+    description: post.description || post.title,
+    url: 'https://adamhoward56.github.io/blog/' + post.slug + '.html',
+    type: 'article',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: post.title,
+      description: post.description,
+      datePublished: post.date,
+      author: { '@type': 'Person', name: 'Adam Howard', url: 'https://adamhoward56.github.io' },
+      url: 'https://adamhoward56.github.io/blog/' + post.slug + '.html'
+    }
+  });
+}
+
+// --- Main ---
+
+if (fs.existsSync(DOCS_DIR)) fs.rmSync(DOCS_DIR, { recursive: true });
+fs.mkdirSync(path.join(DOCS_DIR, 'blog'), { recursive: true });
+
+const posts = readPosts();
+
+fs.writeFileSync(path.join(DOCS_DIR, 'index.html'), buildHome(posts));
+for (const post of posts) {
+  fs.writeFileSync(path.join(DOCS_DIR, 'blog', post.slug + '.html'), buildPost(post));
+}
+
+fs.copyFileSync(path.join(__dirname, 'style.css'), path.join(DOCS_DIR, 'style.css'));
+
+console.log(`Built ${posts.length} post(s) -> docs/`);
