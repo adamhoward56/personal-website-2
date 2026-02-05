@@ -7,5 +7,8 @@
   "dependencies": {
     "gray-matter": "^4.0.3",
     "marked": "^15.0.0"
+  },
+  "devDependencies": {
+    "canvas": "^3.2.1"
   }
 }

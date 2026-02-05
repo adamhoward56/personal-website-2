@@ -241,6 +241,9 @@ function page(title, body, seo) {
   <title>${title}</title>
   <meta name="description" content="${desc}">
   <meta name="author" content="Adam Howard">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/favicon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="canonical" href="${url}">
 
   <meta property="og:title" content="${title}">
@@ -425,5 +428,13 @@ for (const post of posts) {
 }
 
 fs.copyFileSync(path.join(__dirname, 'style.css'), path.join(DOCS_DIR, 'style.css'));
+
+// Copy static files (favicons, etc.)
+const STATIC_DIR = path.join(__dirname, 'static');
+if (fs.existsSync(STATIC_DIR)) {
+  for (const file of fs.readdirSync(STATIC_DIR)) {
+    fs.copyFileSync(path.join(STATIC_DIR, file), path.join(DOCS_DIR, file));
+  }
+}
 
 console.log(`Built ${posts.length} post(s) -> docs/`);
